@@ -1,0 +1,697 @@
+rm(list = ls())
+rm()
+
+# --- Paquetes----
+pkgs <- c("readxl","tidyverse","naniar","VIM","mice","purrr",
+          "rlang","stringi","MissMech","stringr","tibble",
+          "broom","logistf","forcats")
+inst <- setdiff(pkgs, rownames(installed.packages()))
+if (length(inst)) install.packages(inst, dependencies = TRUE)
+invisible(lapply(pkgs, library, character.only = TRUE))
+
+
+# ----------Cargar base desde Excel----
+db <- read_excel("db.xlsx")
+
+
+
+#----------- Agrupacion variables----
+# ==== Demograficos
+vars_demo_tot <- c("edad","egreso","ltrabajo","a1","hsemanales","hnocturnas","n12hrs","n24hrs")
+
+vars_demo_cual <- c("hombre1","region","nmod", "eprofesional", "gacademico","espec","subesp","tinstitucion","natencion","ringreso","r1","r2")
+
+
+# ==== Consecuencias propuestas
+vars_conseq_tot <- c("MECG","me_ind","me_diag","me_info","me_tratar",
+                     "me_regis","me_comun","me_proced","dayabs")
+
+vars_main <- c("MECG","dayabs","bo_total")
+
+vars_conseq_cual <- c("turn1","turn2","abs")
+
+# ==== Burnout
+vars_burnout_tot <- c("bo_total","bo_fatiga","bo_logro","bo_desper")
+
+vars_burnout_cual <- c("bo_total_cat","bo_fatiga_cat","bo_logro_cat","bo_desper_cat",
+                      "sd_bo_estric","sd_bo_med","sd_bo_lax")
+
+# ==== Factores sociolaborales
+vars_sociolab_tot <- c("puesto_inetabilidad","puesto_jornada","puesto_tiempo",
+                       "puesto_rol","puesto_respons","puesto_administr","puesto_cognitiv",
+                       "puesto_emocional",
+                       "equipo_inequidad","equipo_conflicto","equipo_acoso",
+                       "jefe_destructiv","jefe_pasiv","jefe_autoritari",
+                       "organiz_comunicacion","organiz_coordin","organiz_inequidad","organiz_politica",
+                       "organiz_inseguridad","organiz_familia")
+
+# ==== Factores por COVID
+vars_covid_tot <- c("padece_covid","fallece_covid","protocolo_covid",
+                    "implemento_covid","riesgo_covid","apoyo_covid","preocupacion_covid")
+
+# ==== Factores psicológicos
+vars_psico_tot <- c("pers_ext","pers_agree","pers_consc","pers_neuro","pers_open",
+                    "mhc_ew","mhc_sw","mhc_pw",
+                    "mfn_obs","mfn_des","mfn_awa","mfn_nj","mfn_nr",
+                    "scs_sk","scs_sj","scs_ch","scs_iso","scs_mfn","scs_oi")
+
+
+
+
+# POR ITEMS
+# ==== Burnout
+vars_burnout_items <- c("ee1","ee2","ee3","pa4","de5","ee6","pa7","ee8","pa9","de10","de11","pa12",
+                        "ee13","ee14","de15","ee16","pa17","pa18","pa19","ee20","pa21","de22")
+
+# ==== Factores sociolaborales
+vars_sociolab_items <- c("wines1","wines2","wines3","whora1","whora2","whora3","wcarg1","wcarg2","wcarg3",
+                         "wrol1","wrol2","wrol3","wresp1","wresp2","wresp3","wadmi1","wadmi2","wadmi3",
+                         "wcogn1","wcogn2","wcogn3","wcogn4","wemo1","wemo2","wemo3",
+                         "gineq1","gineq2","gineq3","gconf1","gconf2","gconf3",
+                         "gviol1","gviol2","gviol3","gjdes1","gjdes2","gjdes3",
+                         "gjpas1","gjpas2","gjpas3","gjaut1","gjaut2","gjaut3",
+                         "ocomu1","ocomu2","ocomu3","ocoord1","ocoord2","ocoord3",
+                         "oineq1","oineq2","oineq3","opoli1","opoli2","opoli3",
+                         "oinseg1","oinseg2","oinseg3","otrfm1","otrfm2","otrfm3","otrfm4")
+
+# ==== Factores por COVID
+vars_covid_items <- c("ccont1","ccont2","ccont3","ccont4","ccont5","ccont6","ccont7","ccont8",
+                      "csitu1","csitu2","csitu3","csitu4","csitu5","csitu6","csitu7","csitu8","csitu9",
+                      "csitu10","csitu11","csitu12","csitu13",
+                      "cpreo1","cpreo2","cpreo3","cpreo4","cpreo5","cpreo6","cpreo7",
+                      "cestig1","cestig2","cestig3","cestig4")
+
+# ==== Factores psicológicos
+vars_psico_items <- c("ew1","ew2","ew3","sw1","sw2","sw3","sw4","sw5",
+                      "psw1","psw2","psw3","psw4","psw5","psw6",
+                      "ext1r","agree1","cons1r","neur1","open1",
+                      "ext2","agree2r","cons2r","neur2","open2r",
+                      "ext3","agree3","cons3","neur3r","open3",
+                      "ext4","agree4r","cons4","neur4r","open4r",
+                      "ext5r","agree5","cons5","neur5r","open5",
+                      "ext6r","agree6r","cons6r","neur6","open6r",
+                      "ds1","ds2","nr1","nj1r","ds3r","obs1","nj2r","awa1r","nr2","obs2",
+                      "ds4r","awa2r","nr3","nj3r","obs3","ds5","awa3r","nr4","nj4r","obs4",
+                      "nr5","awa4r","awa5r","nj5r","oi1","sk1","mf1","iso1","ch1","sk2",
+                      "mf2","iso2","oi2","ch2","sj1","sj2")
+
+
+#----------- Diccionario de variabes  ----
+
+var_labels <- c(
+  # Demográficos
+  "tmedicion"        = "Timepoint",
+  "grupo"            = "Group",
+  "hombre1"          = "Sex",
+  "edad"             = "Age (years)",
+  "region"           = "Region of practice",
+  
+  # Profesionales
+  "colegiado"        = "Registered physician",
+  "eprofesional"     = "Professional status",
+  "gacademico"       = "Academic degree",
+  "espec"            = "Medical specialty",
+  "subesp"           = "Subspecialty",
+  "egreso"           = "Years since graduation",
+  "nmod"             = "Nationality",
+  "ltrabajo"         = "Workplaces (number)",
+  "a1"               = "Seniority in current position (years)",
+  "tinstitucion"     = "Institution type",
+  "natencion"        = "Healthcare level",
+  "hsemanales"       = "Weekly working hours",
+  "hnocturnas"       = "Night working hours",
+  "n12hrs"           = "Number of 12-hour shifts",
+  "n24hrs"           = "Number of 24-hour shifts",
+  "ringreso"         = "Income range",
+  "r1"               = "Employment contract type (main workplace)",
+  "r2"               = "Employment contract type (secondary workplace)",
+  
+  # Consecuencias
+  "turn1"            = "Turnover (main workplace)",
+  "turn2"            = "Turnover (secondary workplace)",
+  "abs"              = "Absenteeism",
+  "dayabs"           = "Days of absenteeism",
+  "MECG"             = "Medical Error Checklist – General (Total)",
+  "me_ind"           = "MECG – Inquiry & Clinical history errors",
+  "me_diag"          = "MECG – Diagnostic errors",
+  "me_info"          = "MECG – Information transfer errors",
+  "me_tratar"        = "MECG – Treatment errors",
+  "me_regis"         = "MECG – Documentation errors",
+  "me_comun"         = "MECG – Communication conflicts",
+  "me_proced"        = "MECG – Procedural errors",
+  
+  # Burnout
+  "bo_total"         = "Burnout – Total score (MBI-HSS)",
+  "bo_fatiga"        = "Emotional exhaustion",
+  "bo_logro"         = "Personal accomplishment",
+  "bo_desper"        = "Depersonalisation",
+  "bo_total_cat"     = "Burnout classification (total)",
+  "bo_fatiga_cat"    = "Emotional exhaustion category",
+  "bo_logro_cat"     = "Personal accomplishment category",
+  "bo_desper_cat"    = "Depersonalisation category",
+  "sd_bo_estric"     = "Burnout (strict criteria)",
+  "sd_bo_med"        = "Burnout (medium criteria)",
+  "sd_bo_lax"        = "Burnout (lax criteria)",
+  
+  # Sociolaborales
+  "puesto_inetabilidad"  = "Job instability",
+  "puesto_jornada"       = "Workload & hours",
+  "puesto_tiempo"        = "Time pressure",
+  "puesto_rol"           = "Role ambiguity",
+  "puesto_respons"       = "Responsibility load",
+  "puesto_administr"     = "Administrative obstacles",
+  "puesto_cognitiv"      = "Cognitive demands",
+  "puesto_emocional"     = "Emotional demands",
+  "equipo_inequidad"     = "Workload sharing",
+  "equipo_conflicto"     = "Interpersonal conflict",
+  "equipo_acoso"         = "Interpersonal violence / harassment",
+  "jefe_destructiv"      = "Destructive supervision",
+  "jefe_pasiv"           = "Passive supervision",
+  "jefe_autoritari"      = "Authoritarian supervision",
+  "organiz_comunicacion" = "Organisational communication problems",
+  "organiz_coordin"      = "Organisational coordination problems",
+  "organiz_inequidad"    = "Effort–reward imbalance",
+  "organiz_politica"     = "Organisational politics",
+  "organiz_inseguridad"  = "Job insecurity",
+  "organiz_familia"      = "Work–family imbalance",
+  
+  # COVID
+  "padece_covid"     = "COVID-19 infection",
+  "fallece_covid"    = "COVID-19 related death",
+  "protocolo_covid"  = "Institutional COVID-19 protocol",
+  "implemento_covid" = "Availability of protective equipment",
+  "riesgo_covid"     = "Risk of COVID-19 exposure",
+  "apoyo_covid"      = "Organisational mental health support (COVID-19)",
+  "preocupacion_covid" = "Concern about COVID-19",
+  
+  # Psicológicos
+  "pers_ext"     = "Extraversion",
+  "pers_agree"   = "Agreeableness",
+  "pers_consc"   = "Conscientiousness",
+  "pers_neuro"   = "Neuroticism",
+  "pers_open"    = "Openness to experience",
+  "mhc_ew"       = "Emotional well-being",
+  "mhc_sw"       = "Social well-being",
+  "mhc_pw"       = "Psychological well-being",
+  "mfn_obs"      = "Observe",
+  "mfn_des"      = "Describe",
+  "mfn_awa"      = "Awareness / Acting with attention",
+  "mfn_nj"       = "Non-judgment",
+  "mfn_nr"       = "Non-reactivity",
+  "scs_sk"       = "Self-kindness",
+  "scs_sj"       = "Low self-judgement",
+  "scs_ch"       = "Common humanity",
+  "scs_iso"      = "Isolation",
+  "scs_mfn"      = "Mindfulness",
+  "scs_oi"       = "Over-identification"
+)
+
+# ==== Diccionario nombres de valores cualitativos ====
+
+
+value_labelsf <- list(
+  
+  # ---- Binarios y ordinales (códigos
+  "Absenteeism" = c("1" = "Yes", "2" = "No"),
+  "Sex"         = c("1" = "Male", "2" = "Female"),
+  "Burnout (strict criteria)" = c("0" = "No", "1" = "Yes"),
+  "Burnout (lax criteria)"    = c("0" = "No", "1" = "Yes"),
+  "Burnout (medium criteria)" = c("0" = "No", "1" = "Yes"),
+  "Turnover"                  = c("0" = "No", "1" = "Yes"),
+  
+  # ---- Tricategóricas alto/medio/bajo
+  "Depersonalisation category"     = c("alto"="High","bajo"="Low","moderado"="Moderate"),
+  "Emotional exhaustion category"  = c("alto"="High","bajo"="Low","moderado"="Moderate"),
+  "Personal accomplishment category" = c("alto"="High","bajo"="Low","moderado"="Moderate"),
+  "Burnout classification (total)" = c("alto"="High","bajo"="Low","moderado"="Moderate"),
+  
+  # ---- Grado académico (según tu glosario
+  # Nota: tu glosario tiene 5 categorías; en la tabla aparecen 1..6.
+  # Adapto: 1=None, 2=Diploma, 3=Master's, 4=Doctorate, 5=Postdoc, 6=Other
+  "Academic degree" = c(
+    "1"="None","2"="Diploma","3"="Master’s","4"="Doctorate","5"="Postdoctoral","6"="Other"
+  ),
+  
+  # ---- Nivel de atención
+  "Healthcare level" = c("1"="Primary","2"="Secondary","3"="Tertiary"),
+  
+  # ---- Estado profesional (eprofesional) ---
+  # (Estudiante, Médico general, Residente, Especialista, Subespecialista)
+  "Professional status" = c(
+    "1"="Medical student","2"="General practitioner","3"="Resident",
+    "4"="Specialist","5"="Subspecialist"
+  ),
+  
+  # ---- Tipo de contrato (principal/secundario
+  # r1/r2: (Contrato fijo, honorarios, sociedad/empresa personal, solo boleta, otro)
+  "Employment contract type (main workplace)" = c(
+    "1"="Permanent contract","2"="Fee-for-service","3"="Through personal company",
+    "4"="Invoice only","5"="Other","6"="Unknown/Not reported"
+  ),
+  "Employment contract type (secondary workplace)" = c(
+    "1"="Permanent contract","2"="Fee-for-service","3"="Through personal company",
+    "4"="Invoice only","5"="Other","6"="Unknown/Not reported"
+  ),
+  
+  # ---- Rango de ingresos (si no tienes tramos, dejamos el número tal cual
+  "Income range" = c(
+    "1"="1","2"="2","3"="3","4"="4","5"="5","6"="6","7"="7","8"="8","9"="9"
+  ),
+  
+  # ---- Nacionalidades (traducciones
+  "Nationality" = c(
+    "0"="Unknown","Alemania"="Germany","Argentina"="Argentina","Bolivia"="Bolivia",
+    "Chile"="Chile","Colombia"="Colombia","Cuba"="Cuba","Ecuador"="Ecuador",
+    "España"="Spain","Pakistan"="Pakistan","Uruguay"="Uruguay","Venezuela"="Venezuela"
+  ),
+  
+  # ---- Especialidad médica
+  "Medical specialty" = c(
+    "Anatomía Patológica"="Pathology",
+    "Anestesiologia"="Anesthesiology",
+    "Cirugia"="Surgery",
+    "Dermatologia"="Dermatology",
+    "Fisiatria"="Physical Medicine and Rehabilitation",
+    "General"="General Medicine",
+    "Genetica"="Genetics",
+    "Ginecologia y obstetricia"="Obstetrics and Gynecology",
+    "Medicina Estética"="Aesthetic Medicine",
+    "Medicina Familiar"="Family Medicine",
+    "Medicina Interna"="Internal Medicine",
+    "Microbiología clinica"="Clinical Microbiology",
+    "Neurocirugía"="Neurosurgery",
+    "Neurologia"="Neurology",
+    "Nutriologia"="Nutrition",
+    "Oftalmologia"="Ophthalmology",
+    "Otorrinolaringologia"="Otolaryngology",
+    "Pediatria"="Pediatrics",
+    "Psiquiatria"="Psychiatry",
+    "Radiología"="Radiology",
+    "Reumatologia"="Rheumatology",
+    "Salud Ocupacional"="Occupational Health",
+    "Salud Publica"="Public Health",
+    "Toxicologia Médica"="Medical Toxicology",
+    "Traumatología"="Orthopedics",
+    "Urgenciología"="Emergency Medicine",
+    "Urología"="Urology"
+  ),
+  
+  # ---- Subespecialidad
+  "Subspecialty" = c(
+    "Anatomía Patológica"="Pathology",
+    "Anestesiologia"="Anesthesiology",
+    "Cirugia - Bariatrica"="Bariatric Surgery",
+    "Cirugia - General"="General Surgery",
+    "Cirugia - Vascular"="Vascular Surgery",
+    "Cirugía - Pediátrica"="Pediatric Surgery",
+    "Dermatologia"="Dermatology",
+    "Fisiatria"="Physical Medicine and Rehabilitation",
+    "General"="General Medicine",
+    "Genetica"="Genetics",
+    "Ginecologia y obstetricia - General"="Obstetrics and Gynecology - General",
+    "Ginecologia y obstetricia - Infantojuvenil"="Obstetrics and Gynecology - Adolescent",
+    "Ginecologia y obstetricia - Medicina Reproductiva"="Obstetrics and Gynecology - Reproductive Medicine",
+    "Medicina Estética"="Aesthetic Medicine",
+    "Medicina Familiar - General"="Family Medicine - General",
+    "Medicina Familiar - Infantil"="Family Medicine - Pediatric",
+    "Medicina Interna - Broncopulmonar"="Internal Medicine - Pulmonology",
+    "Medicina Interna - Cardiologia"="Internal Medicine - Cardiology",
+    "Medicina Interna - Endocrinologia"="Internal Medicine - Endocrinology",
+    "Medicina Interna - Gastroenterologia"="Internal Medicine - Gastroenterology",
+    "Medicina Interna - General"="Internal Medicine - General",
+    "Medicina Interna - Hematologia"="Internal Medicine - Hematology",
+    "Medicina Interna - Hematooncologia"="Internal Medicine - Hemato-oncology",
+    "Medicina Interna - Infectologia"="Internal Medicine - Infectious Diseases",
+    "Medicina Interna - Intensivos"="Internal Medicine - Intensive Care",
+    "Medicina Interna - Nefrologia"="Internal Medicine - Nephrology",
+    "Medicina Interna - Reumatologia"="Internal Medicine - Rheumatology",
+    "Microbiología clinica"="Clinical Microbiology",
+    "Neurocirugía"="Neurosurgery",
+    "Neurologia - Adulto"="Neurology - Adult",
+    "Neurologia - Pediatrica"="Neurology - Pediatric",
+    "Nutriologia - General"="Nutrition - General",
+    "Oftalmologia"="Ophthalmology",
+    "Otorrinolaringologia"="Otolaryngology",
+    "Pediatria - Gastroenterología"="Pediatrics - Gastroenterology",
+    "Pediatria - General"="Pediatrics - General",
+    "Pediatria - Hematoncologia"="Pediatrics - Hemato-oncology",
+    "Pediatria - Neonatología"="Pediatrics - Neonatology",
+    "Pediatria - Neurologia"="Pediatrics - Neurology",
+    "Pediatría - Intensivista/Cardiologia"="Pediatrics - Intensive/Cardiology",
+    "Pediatría - Nutriología"="Pediatrics - Nutrition",
+    "Pediatría - Urgencias"="Pediatrics - Emergency",
+    "Psiquiatria - Adultos"="Psychiatry - Adult",
+    "Psiquiatria - Infantojuvenil"="Psychiatry - Child and Adolescent",
+    "Radiologia - General"="Radiology - General",
+    "Reumatologia"="Rheumatology",
+    "Salud Ocupacional"="Occupational Health"
+  ),
+  
+  # ---- Tipo de institución
+  "Institution type" = c(
+    "1" = "Public",
+    "2" = "Private"
+  ),
+  
+  # ---- Rotación laboral (turnover
+  "Turnover (main workplace)" = c(
+    "1" = "Yes",
+    "2" = "No"
+  ),
+  "Turnover (secondary workplace)" = c(
+    "1" = "Yes",
+    "2" = "No"
+  ),
+  
+  # ---- Región de práctica (traducciones cortas
+  "Region of practice" = c(
+    "NO reporta"="Not reported",
+    "Región Metropolitana de Santiago."="Metropolitan Region of Santiago",
+    "Región de Antofagasta."="Antofagasta Region",
+    "Región de Arica y Parinacota."="Arica and Parinacota Region",
+    "Región de Atacama."="Atacama Region",
+    "Región de Aysén del General Carlos Ibáñez del Campo."="Aysén Region",
+    "Región de Coquimbo."="Coquimbo Region",
+    "Región de La Araucanía."="Araucanía Region",
+    "Región de Los Lagos."="Los Lagos Region",
+    "Región de Los Ríos."="Los Ríos Region",
+    "Región de Magallanes y la Antártica Chilena."="Magallanes and Chilean Antarctica Region",
+    "Región de Tarapacá."="Tarapacá Region",
+    "Región de Valparaíso."="Valparaíso Region",
+    "Región del Biobío."="Biobío Region",
+    "Región del Libertador General Bernardo O’Higgins."="O’Higgins Region",
+    "Región del Maule."="Maule Region",
+    "Región del Ñuble."="Ñuble Region"
+  )
+)
+
+value_labels <- imap_dfr(value_labelsf, function(v, var_name) {
+  tibble(
+    variable  = var_name,
+    valor     = names(v) |> as.character(),
+    valor_new = unname(v) |> as.character()
+  )
+})
+
+# ---------- Formato base----
+
+vars_cuant <- c(
+  vars_demo_tot,
+  vars_burnout_tot,
+  vars_psico_tot,
+  vars_conseq_tot,
+  vars_sociolab_tot,
+  vars_covid_tot
+)
+
+vars_cual <- c(
+  vars_demo_cual,
+  vars_conseq_cual,
+  vars_burnout_cual
+)
+
+vars_basales <- c(
+  "hombre1","region","nmod","edad","colegiado","eprofesional","gacademico",
+  "espec","subesp","tinstitucion","natencion","ringreso","r1","rotro","r2",
+  "egreso","ltrabajo","a1","hsemanales","hnocturnas","n12hrs","n24hrs",
+  "pers_ext","pers_agree","pers_consc","pers_neuro","pers_open"
+) |> unique()
+
+
+db <- db |>
+  mutate(across(where(is.character), ~na_if(trimws(.), ""))) |>
+  mutate(across(any_of("t_medicion"), ~if (is.numeric(.)) factor(.) else as.factor(.)))
+
+db <- db %>%
+  mutate(across(all_of(vars_cuant), ~ as.numeric(.)))
+
+db <- db %>%
+  mutate(across(all_of(vars_cual), ~ as.character(.)))
+
+vars_todas <- c(
+  vars_demo_tot,
+  vars_burnout_tot,
+  vars_psico_tot,
+  vars_conseq_tot,
+  vars_sociolab_tot,
+  vars_covid_tot,
+  vars_demo_cual,
+  vars_conseq_cual,
+  vars_burnout_cual
+)
+
+# Agregar datos T faltantes y rellenar var basales
+db <- db %>%
+  mutate(
+    pid = as.character(pid),
+    t   = as.integer(t),
+    uid = as.character(uid)
+  ) %>%
+  complete(pid, t = unique(t)) %>%                # panel completo pid × t
+  arrange(pid, t) %>%
+  mutate(uid = coalesce(uid, paste(pid, t, sep = "_"))) %>%  # uid nuevo si falta
+  left_join(
+    db %>%
+      mutate(pid = as.character(pid), t = as.integer(t)) %>%
+      group_by(pid) %>%
+      summarise(
+        across(
+          any_of(vars_basales),
+          ~ {
+            v0 <- .x[t == 0][1]                 # valor baseline si existe
+            v0 <- v0[!is.na(v0)][1]
+            if (is.na(v0) || length(v0) == 0) {
+              v0 <- .x[!is.na(.x)][1]           # fallback: primer no-NA
+            }
+            if (length(v0) == 0) v0 <- NA       # si no hay nada, NA
+            v0
+          }
+        ),
+        .groups = "drop"                         # <- va en summarise(), no en across()
+      ),
+    by = "pid",
+    suffix = c("", "_t0")
+  ) %>%
+  mutate(across(any_of(vars_basales), ~ get(paste0(cur_column(), "_t0")))) %>%
+  select(-ends_with("_t0"))
+
+#Descriptivos----
+#**Tab Cuanti----
+
+tab_demo1f <- function(data, list_of_var_groups) {
+  list_of_var_groups |>
+    lapply(function(vars) {
+      data |>
+        select(t, all_of(vars)) |>                            # incluir variable t
+        pivot_longer(-t, names_to = "variable", values_to = "x") |>
+        group_by(variable, t) |>
+        summarise(mean_sd = sprintf("%.1f (%.1f)", mean(x, na.rm = TRUE), sd(x, na.rm = TRUE)),
+                  .groups = "drop") |>
+        pivot_wider(names_from = t, values_from = mean_sd,
+                    names_prefix = "T ")                     # crea columnas t_0, t_1, t_2
+    }) |>
+    bind_rows()
+}
+
+
+tab_demo1 <- tab_demo1f(db, vars_cuant)
+tab_demo1 <- tab_demo1 %>%
+  mutate(variable = recode(variable, !!!var_labels))
+tab_demo1
+
+#**Tab Cuali----
+
+tab_demo2f <- function(data, vars_cual) {
+  data |>
+    select(t, all_of(vars_cual)) |>
+    pivot_longer(-t, names_to = "variable", values_to = "valor") |>
+    group_by(t, variable, valor) |>
+    summarise(n = sum(!is.na(valor)), .groups = "drop_last") |>
+    mutate(
+      total_t = sum(n),
+      perc = (n / total_t) * 100,
+      `N (%)` = sprintf("%d (%.1f)", n, perc)
+    ) |>
+    select(t, variable, valor, `N (%)`) |>
+    pivot_wider(
+      names_from = t,
+      values_from = `N (%)`,
+      names_prefix = "T "
+    ) |>
+    arrange(variable, valor)
+}
+
+tab_demo2 <- tab_demo2f(db, vars_cual)
+tab_demo2 <- tab_demo2 %>%
+  mutate(variable = recode(variable, !!!var_labels))
+tab_demo2 <- tab_demo2 %>%
+  mutate(
+    variable = as.character(variable),
+    valor    = as.character(valor)
+  ) %>%
+  left_join(value_labels, by = c("variable", "valor")) %>%
+  mutate(valor = coalesce(valor_new, valor)) %>%
+  select(-valor_new)
+
+
+tab_demo2
+
+
+# Tab Normalidad (Shapiro–Wilk)-----
+shapiro_p <- function(x) {
+  x <- x[!is.na(x)]
+  if (length(x) >= 3 && length(x) <= 5000) shapiro.test(x)$p.value else NA_real_
+}
+
+## Global
+tab_shapiro <- db |>
+  select(where(is.numeric)) |>
+  summarise(across(everything(), shapiro_p)) |>
+  pivot_longer(everything(), names_to = "variable", values_to = "p_shapiro")
+
+
+#  Tab Outliers (regla IQR)----
+iqr_out <- function(x){
+  x <- x[!is.na(x)]
+  if (!length(x)) {
+    return(list(
+      n = 0, q1 = NA_real_, q3 = NA_real_, iqr = NA_real_,
+      lower = NA_real_, upper = NA_real_, n_out = 0, prop = NA_real_
+    ))
+  }
+  q  <- quantile(x, c(.25,.75), names = FALSE)
+  I  <- q[2]-q[1]
+  lo <- q[1] - 1.5*I
+  hi <- q[2] + 1.5*I
+  out <- sum(x < lo | x > hi)
+  list(
+    n = length(x), q1 = q[1], q3 = q[2], iqr = I,
+    lower = lo, upper = hi, n_out = out, prop = out/length(x)
+  )
+}
+
+tab_outliers <- db |>
+  dplyr::select(where(is.numeric)) |>
+  tidyr::pivot_longer(everything(), names_to = "variable", values_to = "x") |>
+  dplyr::group_by(variable) |>
+  dplyr::reframe({
+    res <- iqr_out(x)
+    tibble::tibble(n_out = res$n_out, prop = res$prop)
+  })
+
+
+# Missing data----
+#**Tab missing----
+
+tab_miss <- db %>%
+  select(pid, t, bo_total) %>%
+  pivot_longer(-c(pid, t), names_to = "variable", values_to = "x") %>%
+  group_by(t, variable) %>%
+  summarise(
+    total_pid   = n_distinct(pid),
+    n_obs       = sum(!is.na(x)),
+    n_missing   = total_pid - n_obs,
+    pct_missing = 100 * n_missing / total_pid,
+    .groups = "drop"
+  ) %>%
+  arrange(variable, t)
+
+tab_miss
+
+#**Tab NA----
+
+tab_naf <- function(df, vars, nombre_grupo = "todas"){
+  vars_ok <- intersect(vars, names(df))
+  df |>
+    dplyr::select(t, dplyr::all_of(vars_ok)) |>
+    tidyr::pivot_longer(-t, names_to = "variable", values_to = "valor") |>
+    dplyr::group_by(t) |>
+    dplyr::summarise(
+      n_total = dplyr::n(),
+      n_na    = sum(is.na(valor)),
+      prop_na = n_na / n_total,
+      .groups = "drop"
+    ) |>
+    dplyr::mutate(grupo = nombre_grupo) |>
+    dplyr::select(grupo, dplyr::everything())
+}
+
+# Úsalo así:
+tab_nan <- tab_naf(db, vars_cuant, "todas")
+tab_nac <- tab_naf(db, vars_cual, "todas")
+
+#**Little MCAR-MAR test----
+
+db_mcar <- db %>%
+  select(pid, t, bo_total, MECG, dayabs, turn1) %>%
+  mutate(
+    t     = as.numeric(t),
+    turn1 = suppressWarnings(as.numeric(turn1))  # por si viene como factor/char
+  ) %>%
+  select(-pid)
+
+mcar_test <- TestMCARNormality(db_mcar)
+mcar_test
+
+
+#**GLM MCAR-MAR Reg----
+
+#**lista de predictores 
+vars_pred_miss <- c(
+  "hombre1","region","edad","tinstitucion","natencion",
+  "turn1","turn2","abs","dayabs","MECG","bo_total",
+  "puesto_inetabilidad","puesto_jornada","puesto_tiempo","puesto_rol",
+  "puesto_respons","puesto_administr","puesto_cognitiv","puesto_emocional",
+  "equipo_inequidad","equipo_conflicto","equipo_acoso",
+  "jefe_destructiv","jefe_pasiv","jefe_autoritari",
+  "organiz_comunicacion","organiz_coordin","organiz_inequidad","organiz_politica",
+  "organiz_inseguridad","organiz_familia",
+  "pers_ext","pers_agree","pers_consc","pers_neuro","pers_open",
+  "mhc_ew","mhc_sw","mhc_pw","mfn_obs","mfn_des","mfn_awa","mfn_nj","mfn_nr",
+  "scs_sk","scs_sj","scs_ch","scs_iso","scs_mfn","scs_oi"
+)
+
+predict_missing_from_T0_simple <- function(db, vars_main, vars_pred_miss, times = c(1,2)) {
+  # Predictores en T0
+  df0 <- db %>%
+    filter(t == 0) %>%
+    select(pid, all_of(vars_pred_miss))
+  
+  preds <- intersect(vars_pred_miss, names(df0))
+  if (!length(preds)) stop("No hay predictores válidos en T0.")
+  
+  # Loop: cada outcome en vars_main y cada tiempo destino
+  map_dfr(intersect(vars_main, names(db)), function(v) {
+    map_dfr(times, function(tt) {
+      # Outcome: missing de v en t = tt
+      y_tt <- db %>%
+        filter(t == tt) %>%
+        select(pid, !!rlang::sym(v)) %>%
+        rename(y = !!rlang::sym(v))
+      
+      dat <- df0 %>%
+        left_join(y_tt, by = "pid") %>%
+        mutate(y_miss = as.integer(is.na(y)))
+      
+      # Modelo logístico
+      f <- as.formula(paste("y_miss ~", paste(preds, collapse = " + ")))
+      fit <- glm(f, data = dat, family = binomial())
+      
+      # OR, IC95% y p
+      broom::tidy(fit) %>%
+        dplyr::filter(term != "(Intercept)") %>%
+        dplyr::mutate(
+          OR = exp(estimate),
+          CI_low = exp(estimate - 1.96 * std.error),
+          CI_high = exp(estimate + 1.96 * std.error),
+          p = p.value
+        ) %>%
+        dplyr::select(term, OR, CI_low, CI_high, p) %>%
+        dplyr::mutate(outcome = v, t_target = tt, method = "glm") %>%
+        dplyr::relocate(outcome, t_target, method)
+    })
+  })
+}
+
+
+tab_miss_reg <- predict_missing_from_T0_simple(db, vars_main, vars_pred_miss, times = c(1,2))
