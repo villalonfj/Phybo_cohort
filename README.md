@@ -1,0 +1,1 @@
+The aim of this study was to evaluate longitudinal follow-up without medical interventions using measurements collected at baseline  3 months, and 6 months. The study assessed several variables described later in the protocol.
